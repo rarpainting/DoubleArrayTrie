@@ -6,9 +6,9 @@ import (
 )
 
 type Node struct {
-	code int
+	code  int
 	depth int
-	left int
+	left  int
 	right int
 }
 
@@ -17,8 +17,8 @@ func (n *Node) String() string {
 }
 
 type ListNode struct {
-	size_   int
-	nodes  []*Node
+	size_ int
+	nodes []*Node
 }
 
 func NewListNode() *ListNode {
@@ -43,25 +43,25 @@ func (l *ListNode) add(node *Node) {
 }
 
 type Word struct {
-	runes  []rune
+	runes []rune
 }
 
 func NewWord(word string) *Word {
 	return &Word{runes: []rune(word)}
 }
 
-func (w *Word)GetWord() string {
+func (w *Word) GetWord() string {
 	return string(w.runes)
 }
 
-func (w *Word)GetRune(index int) rune {
+func (w *Word) GetRune(index int) rune {
 	if index < 0 || index >= len(w.runes) {
 		panic("invalid index")
 	}
 	return w.runes[index]
 }
 
-func (w *Word)GetRunes() []rune {
+func (w *Word) GetRunes() []rune {
 	return w.runes
 }
 
@@ -69,7 +69,7 @@ func (w *Word) Size() int {
 	return len(w.runes)
 }
 
-func (w *Word)String() string {
+func (w *Word) String() string {
 	return string(w.runes)
 }
 
@@ -107,23 +107,23 @@ func (d *WordCodeDict) Code(word rune) int {
 }
 
 type DoubleArrayTrie struct {
-	base   []int
-	check  []int
-	used   []bool
-	size   int
-	allocSize int
-	key    []*Word
-	keySize int
-	length []int
-	value  []int
-	progress int
+	base         []int
+	check        []int
+	used         []bool
+	size         int
+	allocSize    int
+	key          []*Word
+	keySize      int
+	length       []int
+	value        []int
+	progress     int
 	nextCheckPos int
-	error_  int
+	error_       int
 	wordCodeDict *WordCodeDict
 }
 
-func (dat *DoubleArrayTrie)resize(newSize int) int {
-	fmt.Println("resize ", newSize)
+func (dat *DoubleArrayTrie) resize(newSize int) int {
+	// fmt.Println("resize ", newSize)
 	base2 := make([]int, newSize)
 	check2 := make([]int, newSize)
 	used2 := make([]bool, newSize)
@@ -223,7 +223,7 @@ func (dat *DoubleArrayTrie) insert(siblings *ListNode) int {
 	nonzero_num := 0
 	first := 0
 	var pos int
-	if siblings.get(0).code + 1 > dat.nextCheckPos {
+	if siblings.get(0).code+1 > dat.nextCheckPos {
 		pos = siblings.get(0).code + 1
 	} else {
 		pos = dat.nextCheckPos
@@ -233,13 +233,13 @@ func (dat *DoubleArrayTrie) insert(siblings *ListNode) int {
 	if dat.allocSize <= pos {
 		dat.resize(pos + 1)
 	}
-	OUTER:
+OUTER:
 	// 此循环体的目标是找出满足base[begin + a1...an]==0, check[begin + a1...an]==0的n个空闲空间,a1...an是siblings中的n个节点
 	for {
 		pos++
 
 		if dat.allocSize <= pos {
-			dat.resize(pos+1)
+			dat.resize(pos + 1)
 		}
 		if dat.check[pos] != 0 {
 			nonzero_num++
@@ -249,10 +249,10 @@ func (dat *DoubleArrayTrie) insert(siblings *ListNode) int {
 			first = 1
 		}
 		begin = pos - siblings.get(0).code
-		if dat.allocSize <= (begin + siblings.get(siblings.size() - 1).code) {
+		if dat.allocSize <= (begin + siblings.get(siblings.size()-1).code) {
 			// progress can be zero
 			var l float64
-			tmp_l := 1.0 * float64(dat.keySize) / float64(dat.progress + 1)
+			tmp_l := 1.0 * float64(dat.keySize) / float64(dat.progress+1)
 			if 1.05 > tmp_l {
 				l = 1.05
 			} else {
@@ -260,17 +260,17 @@ func (dat *DoubleArrayTrie) insert(siblings *ListNode) int {
 			}
 			dat.resize(int(float64(dat.allocSize) * l))
 		}
-        // 这个位置已经被使用了
+		// 这个位置已经被使用了
 		if dat.used[begin] {
 			continue
 		}
 
 		// 检查是否存在冲突
 		for i := 0; i < siblings.size(); i++ {
-			if dat.base[begin + siblings.get(i).code] != 0 {
+			if dat.base[begin+siblings.get(i).code] != 0 {
 				continue OUTER
 			}
-			if dat.check[begin + siblings.get(i).code] != 0 {
+			if dat.check[begin+siblings.get(i).code] != 0 {
 				continue OUTER
 			}
 		}
@@ -278,12 +278,12 @@ func (dat *DoubleArrayTrie) insert(siblings *ListNode) int {
 		break
 	}
 
-	if 1.0 * float64(nonzero_num) / float64(pos - dat.nextCheckPos + 1) >= 0.95 {
+	if 1.0*float64(nonzero_num)/float64(pos-dat.nextCheckPos+1) >= 0.95 {
 		dat.nextCheckPos = pos
 	}
-    // 标记位置被占用
+	// 标记位置被占用
 	dat.used[begin] = true
-	tmp_size := begin + siblings.get(siblings.size() - 1).code + 1
+	tmp_size := begin + siblings.get(siblings.size()-1).code + 1
 	// 更新 tire的size
 	if dat.size < tmp_size {
 		dat.size = tmp_size
@@ -292,7 +292,7 @@ func (dat *DoubleArrayTrie) insert(siblings *ListNode) int {
 	// base[s] + c = t
 	// check[t] = s
 	for i := 0; i < siblings.size(); i++ {
-		dat.check[begin + siblings.get(i).code] = begin
+		dat.check[begin+siblings.get(i).code] = begin
 	}
 
 	// 计算所有子节点的base
@@ -301,12 +301,12 @@ func (dat *DoubleArrayTrie) insert(siblings *ListNode) int {
 		//// 一个词的终止且不为其他词的前缀，其实就是叶子节点
 		if dat.fetch(siblings.get(i), new_siblings) == 0 {
 			if dat.value != nil {
-				dat.base[begin+siblings.get(i).code] = dat.value[siblings.get(i).left - 1] * (-1) - 1
+				dat.base[begin+siblings.get(i).code] = dat.value[siblings.get(i).left-1]*(-1) - 1
 			} else {
-				dat.base[begin+siblings.get(i).code] = siblings.get(i).left * (-1) - 1
+				dat.base[begin+siblings.get(i).code] = siblings.get(i).left*(-1) - 1
 			}
 
-			if dat.value != nil && (dat.value[siblings.get(i).left] * (-1) - 1) >= 0 {
+			if dat.value != nil && (dat.value[siblings.get(i).left]*(-1)-1) >= 0 {
 				dat.error_ = -2
 				return 0
 			}
@@ -349,7 +349,7 @@ func (dat *DoubleArrayTrie) GetSize() int {
 
 func (dat *DoubleArrayTrie) GetNonzeroSize() int {
 	result := 0
-	for i := 0; i< dat.size; i++ {
+	for i := 0; i < dat.size; i++ {
 		if dat.check[i] != 0 {
 			result++
 		}
@@ -365,7 +365,7 @@ func (dat *DoubleArrayTrie) BuildAdvanced(_key []string, _length []int, _value [
 	if _keySize > len(_key) || _key == nil {
 		return 0
 	}
-    var words []*Word
+	var words []*Word
 	for _, key := range _key {
 		words = append(words, NewWord(key))
 	}
@@ -393,7 +393,7 @@ func (dat *DoubleArrayTrie) BuildAdvanced(_key []string, _length []int, _value [
 
 	dat.key = nil
 	dat.used = nil
-    dat.loseWeight()
+	dat.loseWeight()
 	return dat.error_
 }
 
@@ -428,7 +428,7 @@ func (dat *DoubleArrayTrie) ExactMatchSearchAdvanced(key string, pos int, length
 	n := dat.base[p]
 
 	if b == dat.check[p] && n < 0 {
-		result = n * (-1) - 1
+		result = n*(-1) - 1
 	}
 	return result
 }
@@ -456,7 +456,7 @@ func (dat *DoubleArrayTrie) CommonPrefixSearchAdvanced(key string, pos int, leng
 		n = dat.base[p]
 
 		if b == dat.check[p] && n < 0 {
-			result = append(result, (n * (-1) - 1))
+			result = append(result, (n*(-1) - 1))
 		}
 
 		p = b + dat.wordCodeDict.Code(keyChars[i]) + 1
@@ -471,7 +471,7 @@ func (dat *DoubleArrayTrie) CommonPrefixSearchAdvanced(key string, pos int, leng
 	n = dat.base[p]
 
 	if b == dat.check[p] && n < 0 {
-		result = append(result, (n * (-1) - 1))
+		result = append(result, (n*(-1) - 1))
 	}
 	return result
 }
@@ -485,8 +485,7 @@ func (dat *DoubleArrayTrie) Dump() {
 }
 
 type ByRune []rune
+
 func (a ByRune) Len() int           { return len(a) }
 func (a ByRune) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByRune) Less(i, j int) bool { return a[i] < a[j] }
-
-
