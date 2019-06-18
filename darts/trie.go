@@ -1,3 +1,8 @@
+/*
+状态 base 的转移方程
+base[t] + c.code = base[tc]
+base[t] + x.code = base[tx]
+*/
 package darts
 
 import (
@@ -29,7 +34,7 @@ func (l *ListNode) size() int {
 	return l.size_
 }
 
-// TODO check index > size
+// TODO: check index > size
 func (l *ListNode) get(index int) *Node {
 	if index < 0 {
 		return nil
@@ -55,9 +60,6 @@ func (w *Word) GetWord() string {
 }
 
 func (w *Word) GetRune(index int) rune {
-	if index < 0 || index >= len(w.runes) {
-		panic("invalid index")
-	}
 	return w.runes[index]
 }
 
@@ -86,15 +88,20 @@ func NewWordCodeDict(words []*Word) *WordCodeDict {
 			dict[r] = 0
 		}
 	}
-	for r, _ := range dict {
+
+	for r := range dict {
 		_words = append(_words, r)
 	}
+
+	// sort _words
 	sort.Sort(ByRune(_words))
+
 	nextCode := 1
 	for _, r := range _words {
 		dict[r] = nextCode
 		nextCode++
 	}
+
 	return &WordCodeDict{nextCode: nextCode, dict: dict}
 }
 
@@ -102,7 +109,7 @@ func (d *WordCodeDict) Code(word rune) int {
 	if code, ok := d.dict[word]; ok {
 		return code
 	}
-	// 返回一个非法值
+	// 返回一个非法值(新值), 因为 d.nextCode > len(d.dict)
 	return d.nextCode
 }
 
@@ -119,11 +126,10 @@ type DoubleArrayTrie struct {
 	progress     int
 	nextCheckPos int
 	error_       int
-	wordCodeDict *WordCodeDict
+	wordCodeDict *WordCodeDict // 构建字典树, 记录 字 在 整个字典 的顺序号
 }
 
 func (dat *DoubleArrayTrie) resize(newSize int) int {
-	// fmt.Println("resize ", newSize)
 	base2 := make([]int, newSize)
 	check2 := make([]int, newSize)
 	used2 := make([]bool, newSize)
@@ -140,6 +146,7 @@ func (dat *DoubleArrayTrie) resize(newSize int) int {
 	return newSize
 }
 
+// 以某个节点为父节点, (单纯)构建该节点的子节点
 func (dat *DoubleArrayTrie) fetch(parent *Node, siblings *ListNode) int {
 	if dat.error_ < 0 {
 		return 0
@@ -155,7 +162,7 @@ func (dat *DoubleArrayTrie) fetch(parent *Node, siblings *ListNode) int {
 			}
 		} else {
 			// 子节点的长度必须大于父节点的深度(即单词长度)
-			// 如果len(dat.key[i]) < parent.depth,说明已经是叶子节点了
+			// 如果 len(dat.key[i]) < parent.depth, 说明已经是叶子节点了
 			if dat.key[i].Size() < parent.depth {
 				continue
 			}
@@ -165,6 +172,7 @@ func (dat *DoubleArrayTrie) fetch(parent *Node, siblings *ListNode) int {
 		cur := 0
 		if dat.length != nil {
 			if dat.length[i] != 0 {
+				// 查询 cur 是否是字典合法的
 				cur = dat.wordCodeDict.Code(tmp.GetRune(parent.depth)) + 1
 			}
 		} else {
@@ -189,15 +197,16 @@ func (dat *DoubleArrayTrie) fetch(parent *Node, siblings *ListNode) int {
 		//        [nil(d=3,l=0,r=1)]   [z(d=3,l=1,r=2)]
 		//                             /
 		//                           [nil(d=4,l=1,r=2)]
-		// 一个完整的单词最后一个结束节点的left,right与父节点保持一致
+		// 一个完整的单词最后一个结束节点的 left, right 与父节点保持一致
 		if cur != prev || siblings.size() == 0 {
-			tmp_node := new(Node)
-			tmp_node.depth = parent.depth + 1
-			tmp_node.code = cur
-			// 左边界根据不同的前缀而不同
-			tmp_node.left = i
+			tmp_node := &Node{
+				depth: parent.depth + 1,
+				code:  cur,
+				left:  i, // 左边界根据不同的前缀而不同
+			}
+
 			if siblings.size() != 0 {
-				// 新的节点要加入,前一个右节点的边界需要调整,与新节点的左边界相同
+				// 新的节点要加入, 前一个右节点的边界需要调整, 与新节点的左边界相同
 				siblings.get(siblings.size() - 1).right = i
 			}
 
@@ -221,9 +230,10 @@ func (dat *DoubleArrayTrie) insert(siblings *ListNode) int {
 
 	begin := 0
 	nonzero_num := 0
-	first := 0
+	first := 0 // 第一轮循环的标识
 	var pos int
-	if siblings.get(0).code+1 > dat.nextCheckPos {
+
+	if siblings.get(0).code+1 > dat.nextCheckPos { // last position
 		pos = siblings.get(0).code + 1
 	} else {
 		pos = dat.nextCheckPos
@@ -234,7 +244,7 @@ func (dat *DoubleArrayTrie) insert(siblings *ListNode) int {
 		dat.resize(pos + 1)
 	}
 OUTER:
-	// 此循环体的目标是找出满足base[begin + a1...an]==0, check[begin + a1...an]==0的n个空闲空间,a1...an是siblings中的n个节点
+	// 此循环体的目标是找出满足 base[begin + (a1...an)]==0, check[begin + (a1...an)]==0 的 n 个空闲空间, (a1...an) 是 siblings 中的 n 个节点
 	for {
 		pos++
 
@@ -244,11 +254,14 @@ OUTER:
 		if dat.check[pos] != 0 {
 			nonzero_num++
 			continue
-		} else if first == 0 {
+		} else if first == 0 { // 第一轮循环
 			dat.nextCheckPos = pos
 			first = 1
 		}
+
+		// 当前位置离第一个兄弟节点的距离
 		begin = pos - siblings.get(0).code
+
 		if dat.allocSize <= (begin + siblings.get(siblings.size()-1).code) {
 			// progress can be zero
 			var l float64
@@ -260,12 +273,14 @@ OUTER:
 			}
 			dat.resize(int(float64(dat.allocSize) * l))
 		}
+
 		// 这个位置已经被使用了
 		if dat.used[begin] {
 			continue
 		}
 
 		// 检查是否存在冲突
+		// 如果 check[i] 不为 0, 则说明此位置已经被别的状态占领了, 需要更换到下一个位置
 		for i := 0; i < siblings.size(); i++ {
 			if dat.base[begin+siblings.get(i).code] != 0 {
 				continue OUTER
@@ -278,13 +293,14 @@ OUTER:
 		break
 	}
 
+	// pos-dat.nextCheckPos >= 0 恒成立
 	if 1.0*float64(nonzero_num)/float64(pos-dat.nextCheckPos+1) >= 0.95 {
 		dat.nextCheckPos = pos
 	}
 	// 标记位置被占用
 	dat.used[begin] = true
 	tmp_size := begin + siblings.get(siblings.size()-1).code + 1
-	// 更新 tire的size
+	// 更新 tire 的 size
 	if dat.size < tmp_size {
 		dat.size = tmp_size
 	}
@@ -295,10 +311,10 @@ OUTER:
 		dat.check[begin+siblings.get(i).code] = begin
 	}
 
-	// 计算所有子节点的base
+	// 计算所有子节点的 base
 	for i := 0; i < siblings.size(); i++ {
 		new_siblings := NewListNode()
-		//// 一个词的终止且不为其他词的前缀，其实就是叶子节点
+		//// 一个词的终止且不为其他词的前缀, 其实就是叶子节点
 		if dat.fetch(siblings.get(i), new_siblings) == 0 {
 			if dat.value != nil {
 				dat.base[begin+siblings.get(i).code] = dat.value[siblings.get(i).left-1]*(-1) - 1
@@ -329,6 +345,8 @@ func (dat *DoubleArrayTrie) clear() {
 	*dat = DoubleArrayTrie{}
 }
 
+// 重建 base / check
+// dat.allocSize = dat.size
 func (dat *DoubleArrayTrie) loseWeight() {
 	base2 := make([]int, dat.size)
 	check2 := make([]int, dat.size)
@@ -382,10 +400,11 @@ func (dat *DoubleArrayTrie) BuildAdvanced(_key []string, _length []int, _value [
 	dat.base[0] = 1
 	dat.nextCheckPos = 0
 
-	root_node := new(Node)
-	root_node.left = 0
-	root_node.right = dat.keySize
-	root_node.depth = 0
+	root_node := &Node{
+		left:  0,
+		right: dat.keySize,
+		depth: 0,
+	}
 
 	siblings := NewListNode()
 	dat.fetch(root_node, siblings)
@@ -476,12 +495,14 @@ func (dat *DoubleArrayTrie) CommonPrefixSearchAdvanced(key string, pos int, leng
 	return result
 }
 
-func (dat *DoubleArrayTrie) Dump() {
+func (dat *DoubleArrayTrie) Dump() (str string) {
 	for i := 0; i < dat.size; i++ {
-		fmt.Printf("i: %d", i)
-		fmt.Printf(" [%d", dat.base[i])
-		fmt.Printf(", %d]\n", dat.check[i])
+		str = str + fmt.Sprintf("i: %d", i)
+		str = str + fmt.Sprintf(" [%d", dat.base[i])
+		str = str + fmt.Sprintf(", %d]\n", dat.check[i])
 	}
+
+	return str
 }
 
 type ByRune []rune

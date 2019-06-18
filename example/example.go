@@ -10,7 +10,7 @@ func main() {
 	words := []string{"一举", "一举一动", "一举成名", "一举成名天下知", "万能", "万能胶"}
 	dat := darts.NewDoubleArrayTrie()
 	fmt.Println("是否错误: ", dat.Build(words))
-	//dat.Dump()
+	// fmt.Println(dat.Dump())
 	index := dat.ExactMatchSearch("万能")
 	if index >= 0 {
 		fmt.Println(words[index])
