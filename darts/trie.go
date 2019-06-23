@@ -2,6 +2,10 @@
 状态 base 的转移方程
 base[t] + c.code = base[tc]
 base[t] + x.code = base[tx]
+
+疑惑:
+1. dat 是以 ac 自动机为蓝本的, 为什么不使用 ac-auto-mation 的以 mark 标志为结束标志 ?
+2. fetch 两次检查 dat.length
 */
 package darts
 
@@ -80,6 +84,7 @@ type WordCodeDict struct {
 	dict     map[rune]int
 }
 
+// 从关键词构建字典
 func NewWordCodeDict(words []*Word) *WordCodeDict {
 	var _words []rune
 	dict := make(map[rune]int)
@@ -119,14 +124,15 @@ type DoubleArrayTrie struct {
 	used         []bool
 	size         int
 	allocSize    int
-	key          []*Word
+	key          []*Word // 词列表
 	keySize      int
 	length       []int
 	value        []int
 	progress     int
 	nextCheckPos int
 	error_       int
-	wordCodeDict *WordCodeDict // 构建字典树, 记录 字 在 整个字典 的顺序号
+	// 构建字典树, 记录 字 在 整个字典 的顺序号(从 1 开始, nextCode 为最大数+1)
+	wordCodeDict *WordCodeDict
 }
 
 func (dat *DoubleArrayTrie) resize(newSize int) int {
@@ -146,6 +152,7 @@ func (dat *DoubleArrayTrie) resize(newSize int) int {
 	return newSize
 }
 
+// 建立 trie tree
 // 以某个节点为父节点, (单纯)构建该节点的子节点
 func (dat *DoubleArrayTrie) fetch(parent *Node, siblings *ListNode) int {
 	if dat.error_ < 0 {
@@ -156,30 +163,23 @@ func (dat *DoubleArrayTrie) fetch(parent *Node, siblings *ListNode) int {
 	// if (dat.length != nil ? dat.length[i]:len(key[i]) < parent.depth)
 	for i := parent.left; i < parent.right; i++ {
 		// 非法单词过滤
-		if dat.length != nil {
-			if dat.length[i] != 0 {
-				continue
-			}
-		} else {
+		if dat.length != nil && dat.length[i] != 0 {
+			continue
+		} else if dat.key[i].Size() < parent.depth {
 			// 子节点的长度必须大于父节点的深度(即单词长度)
 			// 如果 len(dat.key[i]) < parent.depth, 说明已经是叶子节点了
-			if dat.key[i].Size() < parent.depth {
-				continue
-			}
+			continue
 		}
 
 		tmp := dat.key[i]
 		cur := 0
-		if dat.length != nil {
-			if dat.length[i] != 0 {
-				// 查询 cur 是否是字典合法的
-				cur = dat.wordCodeDict.Code(tmp.GetRune(parent.depth)) + 1
-			}
-		} else {
-			if tmp.Size() != parent.depth {
-				cur = dat.wordCodeDict.Code(tmp.GetRune(parent.depth)) + 1
-			}
+		if dat.length != nil && dat.length[i] != 0 {
+			// 查询 dat.key[i] 在字典中的序号, 如果不在字典中就给新的序号
+			cur = dat.wordCodeDict.Code(tmp.GetRune(parent.depth)) + 1
+		} else if tmp.Size() != parent.depth {
+			cur = dat.wordCodeDict.Code(tmp.GetRune(parent.depth)) + 1
 		}
+
 		// key 必须是字典序
 		if prev > cur {
 			dat.error_ = -3
@@ -199,7 +199,7 @@ func (dat *DoubleArrayTrie) fetch(parent *Node, siblings *ListNode) int {
 		//                           [nil(d=4,l=1,r=2)]
 		// 一个完整的单词最后一个结束节点的 left, right 与父节点保持一致
 		if cur != prev || siblings.size() == 0 {
-			tmp_node := &Node{
+			tmpNode := &Node{
 				depth: parent.depth + 1,
 				code:  cur,
 				left:  i, // 左边界根据不同的前缀而不同
@@ -210,7 +210,7 @@ func (dat *DoubleArrayTrie) fetch(parent *Node, siblings *ListNode) int {
 				siblings.get(siblings.size() - 1).right = i
 			}
 
-			siblings.add(tmp_node)
+			siblings.add(tmpNode)
 		}
 
 		prev = cur
@@ -345,7 +345,7 @@ func (dat *DoubleArrayTrie) clear() {
 	*dat = DoubleArrayTrie{}
 }
 
-// 重建 base / check
+// 减肥 base / check
 // dat.allocSize = dat.size
 func (dat *DoubleArrayTrie) loseWeight() {
 	base2 := make([]int, dat.size)
@@ -407,6 +407,7 @@ func (dat *DoubleArrayTrie) BuildAdvanced(_key []string, _length []int, _value [
 	}
 
 	siblings := NewListNode()
+	// Root 节点是 Null 节点
 	dat.fetch(root_node, siblings)
 	dat.insert(siblings)
 
