@@ -14,6 +14,12 @@ import (
 	"sort"
 )
 
+/*
+code: 字典序
+depth: 节点深度
+left: 最左的词的词序
+right: 最右的词的词序
+*/
 type Node struct {
 	code  int
 	depth int
