@@ -184,14 +184,14 @@ type DoubleArrayTrie struct {
 	base         []int
 	check        []int
 	used         []bool
-	size         int
-	allocSize    int
+	size         int     // base check used 已占用的最后一个位置
+	allocSize    int     // base check used 的 allocSize , len(base)
 	key          []*Word // 词列表
-	keySize      int
+	keySize      int     // 总的关键词数
 	length       []int
 	value        []int
-	progress     int
-	nextCheckPos int
+	progress     int // 已构建的词数
+	nextCheckPos int // 下一个使用的 pos
 	error_       int
 	// 构建字典树, 记录 字 在 整个字典 的顺序号(从 1 开始, nextCode 为最大数+1)
 	wordCodeDict *WordCodeDict
@@ -291,11 +291,12 @@ func (dat *DoubleArrayTrie) insert(siblings *ListNode) int {
 		return 0
 	}
 
-	begin := 0
-	nonzero_num := 0
-	first := 0 // 第一轮循环的标识
+	begin := 0 // 当前位置离第一个兄弟节点(字)的距离
+	nonzeroNum := 0
+	isFirst := false // 是否找到第一个插入的点
 	var pos int
 
+	// pos = max(siblings[0].code + 1, dat.nextCheckPos) - 1
 	if siblings.get(0).code+1 > dat.nextCheckPos { // last position
 		pos = siblings.get(0).code + 1
 	} else {
@@ -303,9 +304,6 @@ func (dat *DoubleArrayTrie) insert(siblings *ListNode) int {
 	}
 	pos -= 1
 
-	if dat.allocSize <= pos {
-		dat.resize(pos + 1)
-	}
 OUTER:
 	// 此循环体的目标是找出满足 base[begin + (a1...an)]==0, check[begin + (a1...an)]==0 的 n 个空闲空间, (a1...an) 是 siblings 中的 n 个节点
 	for {
@@ -314,17 +312,19 @@ OUTER:
 		if dat.allocSize <= pos {
 			dat.resize(pos + 1)
 		}
-		if dat.check[pos] != 0 {
-			nonzero_num++
+
+		if dat.check[pos] != 0 { // dat.check[pos] 被占用
+			nonzeroNum++
 			continue
-		} else if first == 0 { // 第一轮循环
-			dat.nextCheckPos = pos
-			first = 1
+		} else if isFirst == false {
+			dat.nextCheckPos = pos // dat.check[pos]
+			isFirst = true
 		}
 
-		// 当前位置离第一个兄弟节点的距离
+		// 当前位置离第一个兄弟节点(字)的距离
 		begin = pos - siblings.get(0).code
 
+		// 百分比 resize -- allocSize < begin + siblings.tail().code
 		if dat.allocSize <= (begin + siblings.get(siblings.size()-1).code) {
 			// progress can be zero
 			var l float64
@@ -337,35 +337,35 @@ OUTER:
 			dat.resize(int(float64(dat.allocSize) * l))
 		}
 
-		// 这个位置已经被使用了
+		// used[begin] 这个位置已经被使用了
 		if dat.used[begin] {
-			continue
+			continue OUTER
 		}
 
 		// 检查是否存在冲突
 		// 如果 check[i] 不为 0, 则说明此位置已经被别的状态占领了, 需要更换到下一个位置
 		for i := 0; i < siblings.size(); i++ {
-			if dat.base[begin+siblings.get(i).code] != 0 {
-				continue OUTER
-			}
-			if dat.check[begin+siblings.get(i).code] != 0 {
+			// base[begin+sibl[i].code] != 0
+			if dat.base[begin+siblings.get(i).code] != 0 ||
+				dat.check[begin+siblings.get(i).code] != 0 {
 				continue OUTER
 			}
 		}
-		// 找到一个没有冲突的位置
+
+		// 所有位置都没有冲突
 		break
 	}
 
-	// pos-dat.nextCheckPos >= 0 恒成立
-	if 1.0*float64(nonzero_num)/float64(pos-dat.nextCheckPos+1) >= 0.95 {
+	if 1.0*float64(nonzeroNum)/float64(pos-dat.nextCheckPos+1) >= 0.95 {
 		dat.nextCheckPos = pos
 	}
 	// 标记位置被占用
 	dat.used[begin] = true
-	tmp_size := begin + siblings.get(siblings.size()-1).code + 1
+	// tmpSize = begin + sibl.last().code + 1
+	tmpSize := begin + siblings.get(siblings.size()-1).code + 1
 	// 更新 tire 的 size
-	if dat.size < tmp_size {
-		dat.size = tmp_size
+	if dat.size < tmpSize {
+		dat.size = tmpSize
 	}
 
 	// base[s] + c = t
@@ -378,7 +378,7 @@ OUTER:
 	// 计算所有子节点的 base
 	for i := 0; i < siblings.size(); i++ {
 		new_siblings := NewListNode()
-		//// 一个词的终止且不为其他词的前缀, 其实就是叶子节点
+		//// 叶子节点: 一个词的终止且不为其他词的前缀, 叶子节点为空节点
 		if dat.fetch(siblings.get(i), new_siblings) == 0 {
 			if dat.value != nil {
 				dat.base[begin+siblings.get(i).code] = dat.value[siblings.get(i).left-1]*(-1) - 1
