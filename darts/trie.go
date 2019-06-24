@@ -60,8 +60,8 @@ end
 - s 的重定位依赖于 s 的子节点
 
 疑惑:
-1. dat 是以 ac 自动机为蓝本的, 为什么不使用 ac-auto-mation 的以 mark 标志为结束标志 ?
-2. fetch 两次检查 dat.length
+1. dat 是以 ac 自动机为蓝本的, 为什么不使用 ac-auto-mation 的以 `mark` 为结束标志 ?
+2. fetch 为什么两次检查 dat.length ?
 */
 package darts
 
