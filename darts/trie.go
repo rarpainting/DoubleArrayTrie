@@ -1,7 +1,64 @@
 /*
-状态 base 的转移方程
-base[t] + c.code = base[tc]
-base[t] + x.code = base[tx]
+三数组基础概念:
+The tripple-array structure is composed of:
+
+- base. Each element in base corresponds to a node of the trie. For a trie nodes, base[s] is the starting index within the next and check pool (to be explained later) for the row of the node s in the transition table.
+
+- next. This array, in coordination with check, provides a pool for the allocation of the sparse vectors for the rows in the trie transition table. The vector data, that is, the vector of transitions from every node, would be stored in this array.
+
+- check. This array works in parallel to next. It marks the owner of every cell in next. This allows the cells next to one another to be allocated to different trie nodes. That means the sparse vectors of transitions from more than one node are allowed to be overlapped.
+
+对于给定状态的 s 和输入字符 c , 三数组(base--基础数据, check--数据判断, next--状态转移)的状态转移:
+
+base_sc := base[s] + c;
+
+if check[base_sc] = s then
+    next state := next[base_sc]
+else
+    fail
+endif
+
+对于一个接收字符c从状态s移动到t的转移, 双数组(base, check) 的转移方程:
+
+check[base(s)+c] = s
+base[s]+c = t
+
+从状态s接收输入c的移动算法:
+
+t := base[s] + c;
+
+if check[t] = s then
+    next state := t
+else
+    fail
+endif
+
+解释: 假定 base[s]+c=t, 同时满足 check[t]=s , 那么认为 check[t] 的父状态是 s , 本次状态转移 **成立**
+
+base 重定位:
+
+Procedure Relocate(s : state; b : base_index)
+{ Move base for state s to a new place beginning at b }
+begin
+    foreach input character c for the state s
+    { i.e. foreach c such that check[base[s] + c]] = s }
+    begin
+        check[b + c] := s;     { mark owner }
+        base[b + c] := base[base[s] + c];     { copy data }
+        { the node base[s] + c is to be moved to b + c;
+          Hence, for any i for which check[i] = base[s] + c, update check[i] to b + c }
+        foreach input character d for the node base[s] + c
+        begin
+            check[base[base[s] + c] + d] := b + c
+        end;
+        check[base[s] + c] := none     { free the cell }
+    end;
+    base[s] := b
+end
+
+关键点:
+- s 的重定位依赖于 s 的子节点
+
 */
 package darts
 
@@ -169,7 +226,7 @@ func (dat *DoubleArrayTrie) fetch(parent *Node, siblings *ListNode) int {
 		}
 
 		tmp := dat.key[i]
-		cur := 0
+		cur := 0 // 前一个字节在字典的序号
 		if dat.length != nil {
 			if dat.length[i] != 0 {
 				// 查询 cur 是否是字典合法的
@@ -223,6 +280,7 @@ func (dat *DoubleArrayTrie) fetch(parent *Node, siblings *ListNode) int {
 	return siblings.size()
 }
 
+// 插入子节点
 func (dat *DoubleArrayTrie) insert(siblings *ListNode) int {
 	if dat.error_ < 0 {
 		return 0
@@ -307,6 +365,7 @@ OUTER:
 
 	// base[s] + c = t
 	// check[t] = s
+	// 构建转移过程
 	for i := 0; i < siblings.size(); i++ {
 		dat.check[begin+siblings.get(i).code] = begin
 	}
@@ -329,8 +388,9 @@ OUTER:
 
 			dat.progress++
 		} else {
-			h := dat.insert(new_siblings)
-			dat.base[begin+siblings.get(i).code] = h
+			// 递归获得 子节点 的 base
+			// h := dat.insert(new_siblings)
+			dat.base[begin+siblings.get(i).code] = dat.insert(new_siblings)
 		}
 	}
 
